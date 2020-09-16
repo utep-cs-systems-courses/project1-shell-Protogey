@@ -2,7 +2,6 @@
 def parse(cmdString):
     outFile = None
     inFile = None
-    print("parse2")
     cmd = ''
     cmdString = re.sub(' +', ' ', cmdString)
     if '>' in cmdString:
