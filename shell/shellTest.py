@@ -74,53 +74,57 @@ import os, sys, re
 
 UInput = " "
 directory = os.getcwd()
-single = False
 
-while(UInput.lower() != "exit"):
+while(UInput != "exit"):
     if 'PS1' is os.environ:
         os.write(1, os.environ['PS1'].encode())
     else:
         os.write(1, ("$ ").encode())
     UInput = input()
+    flag = False
     #checks if the user wants to exit
-    if(UInput.split(' ')[0].lower() == "exit"):
+    if("exit" in UInput):
         os.write(1, ("exiting\n").encode())
         sys.exit()
     #checks if the user wants to ls
-    if(UInput.split(' ')[0].lower() == "ls"):
-        single = True
+    if("ls" in UInput):
+        flag = True
         list = os.listdir(directory)
         for file in list:
             os.write(1, file.encode())
             os.write(1, "\n".encode())
     #checks if the user wants to see the current dir
-    if(UInput.split(' ')[0].lower() == "dir"):
-        single = True
+    if("dir" in UInput):
+        flag = True
         directory = os.getcwd()
         os.write(1, directory.encode())
         os.write(1, "\n".encode())
-    #checks if the input string is more than 2 words (command and arguement or
-    #input command output)
-    if(len(UInput.split()) >= 2):
-        first = UInput.split(' ')[0]
-        second = UInput.split(' ')[1]
-        #if pipe is used anywhere in the input
-        if('|' in UInput):
-            pipe(UInput)
-        #if the second word (command) is < or > 
-        elif(second.lower() == "<" or second.lower() == ">"):
-            parse(UInput)
-        #echo command
-        elif(first.lower() == "echo"):
-            os.write(1, second.encode())
-            os.write(1, "\n".encode())
-        #else unknown command inputted
-        else:
-            print("unknown command", UInput, "\n")
-    #if a single command is type, done to prevent unkown command when it runs
-    elif(single):
-        single = False
+    if("pwd" in UInput):
+        flag = True
+        directory = os.getcwd()
+        os.write(1, directory.encode())
         os.write(1, "\n".encode())
+    #if pipe is used anywhere in the input
+    if('|' in UInput):
+        flag = True
+        pipe(UInput)
+    #if the second word (command) is < or > 
+    if('<' in UInput or '>' in UInput):
+        flag = True
+        parse(UInput)
+    #echo command
+    if("echo " in UInput):
+        flag = True
+        os.write(1, UInput.split()[1].encode())
+        os.write(1, "\n".encode())
+    #else unknown command inputted
+    if("cd " in UInput):
+        flag = True
+        os.chdir(UInput.split()[1].encode())
+        os.write(1, UInput.split()[1].encode())
+    if(flag):
+        pass
     else:
-        print("unknown command", UInput, "\n")
-
+        os.write(1, "unknown command: ".encode())
+        os.write(1, UInput.split(' ')[0].encode())
+        os.write(1, "\n".encode())
