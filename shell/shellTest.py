@@ -26,29 +26,28 @@ def pipe(cmdString):
     second = cmdString.split('|')[1]
     #next we pipe
     pr,pw = os.pipe()
+    for f in (pr, pw):
+        os.set_inheritable(f, True)
     rc = os.fork()
     if rc < 0:
         os.write(1, "fork failed".encode())
         sys.exit(1)
-    elif rc == 0:
-        #child will be in charge, we save our stdin and out
-        stdin = os.dup(0)
+    elif rc == 0:                   # child (forked ok)
         stdout = os.dup(1)
-        #ready our pipe write to output
-        os.dup2(pw, 1)
-        exe(first)
-        #exe first cmd, next ready piperead and stdout to out
-        os.dup2(pr, 0)
-        os.dup2(stdout, 1)
-        exe(second)
-        #exe second cmd, next stdin to in, and close
-        os.dup2(stdin, 0)
-        os.close(stdin)
-        os.close(stdout)
-        os.close(pw)
-        os.close(pr)
+        stdin = os.dup(0)
+        os.close(1)#disconnect display (fd1)
+        os.dup2(pw, 1)#pipe input to display (fd1)
+        for fd in (pr, pw):
+            os.close(fd)#disconnect from pipe
+        exe(first)#replace memory
     else:                           # parent (forked ok)
-        os.write(1, "Piping\n".encode())
+        stdout = os.dup(1)
+        stdin = os.dup(0)
+        os.close(0)#disconnect input
+        os.dup2(pr, 0)#pipe output to input (fd0)
+        for fd in (pr, pw):
+            os.close(fd)#disconnect from pipe
+        exe(second)#replace memory
 
 #exe commands, exec demo from lab
 def exe(cmd):
@@ -69,7 +68,46 @@ def exe(cmd):
     else:
         cFork = os.wait()
 
-                                                        
+def exeOut(cmd):
+    cFork = os.fork()
+    if cFork < 0:
+        os.write(1, "Fork failed -exe".encode())
+        sys.exit(1)
+    elif cFork == 0:
+        cmd = cmd.split()
+        os.close(1) #redirect stdout
+        os.set_inheritable(1, True)
+        for dir in re.split(":", os.environ['PATH']): # try each directory in the path
+            program = "%s/%s" % (dir, cmd[0])
+            try:
+                os.execve(program, cmd, os.environ) # try to exec program
+            except FileNotFoundError:             # ...expected
+                pass                              # ...fail quietly
+            os.write(2, ("Child:    Could not exec %s\n" % cmd[0]).encode())
+            sys.exit(1)
+    else:
+        cFork = os.wait()
+
+def exeIn(cmd):
+    cFork = os.fork()
+    if cFork < 0:
+        os.write(1, "Fork failed -exe".encode())
+        sys.exit(1)
+    elif cFork == 0:
+        cmd = cmd.split()
+        os.close(0) #redirect stdin
+        os.set_inheritable(0, True)
+        for dir in re.split(":", os.environ['PATH']): # try each directory in the path
+            program = "%s/%s" % (dir, cmd[0])
+            try:
+                os.execve(program, cmd, os.environ) # try to exec program
+            except FileNotFoundError:             # ...expected
+                pass                              # ...fail quietly
+            os.write(2, ("Child:    Could not exec %s\n" % cmd[0]).encode())
+            sys.exit(1)
+    else:
+        cFork = os.wait()
+        
 import os, sys, re
 
 UInput = " "
@@ -80,7 +118,7 @@ while(UInput != "exit"):
         os.write(1, os.environ['PS1'].encode())
     else:
         os.write(1, ("$ ").encode())
-    UInput = input()
+    UInput = os.read(0, 100).decode() #read input, no \n
     flag = False
     #checks if the user wants to exit
     if("exit" in UInput):
@@ -111,7 +149,15 @@ while(UInput != "exit"):
     #if the second word (command) is < or > 
     if('<' in UInput or '>' in UInput):
         flag = True
-        parse(UInput)
+        cmd, outFile, inFile = parse(UInput)
+        if('<' in UInput):
+            os.write(1, "redirecting output".encode())
+            exeOut(UInput.split('<')[1])
+        elif('>' in UInput):
+            os.write(1, "redirecting input".encode())
+            exeIn(UInput.split('>')[0])
+        else:
+            os.write(1, "weird bug!".encode())    
     #echo command
     if("echo " in UInput):
         flag = True
