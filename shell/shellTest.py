@@ -52,14 +52,21 @@ def pipe(cmdString):
 
 #exe commands, exec demo from lab
 def exe(cmd):
-    cmd = cmd.split()
-    for dir in re.split(":", os.environ['PATH']):
-        prog = "%s/%s" % (dir, cmd[0])
-        try:
-            os.execve(prog, cmd, os.environ)
-        except FileNotFoundError:
-            os.write(1, ("%s: command not found: exe method\n" % cmd[0]).encode())
-            pass
+    rc = os.fork()
+    if rc<0:
+        os.write(1, ("Fork failed, returning %d\n" % rc).encode())
+        sys.exit(1)
+    elif rc == 0:
+        cmd = cmd.split()
+        for dir in re.split(":", os.environ['PATH']):
+            prog = "%s/%s" % (dir, cmd[0])
+            try:
+                os.execve(prog, cmd, os.environ)
+            except FileNotFoundError:
+                pass
+        os.write(1, ("%s: command not found\n" % cmd[0]).encode())
+    else:
+        rc = os.wait()
 
 def exeOut(cmd):
     cmd, outFile, inFile = parse(cmd)
