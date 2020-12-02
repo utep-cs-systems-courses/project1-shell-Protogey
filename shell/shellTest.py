@@ -1,6 +1,6 @@
 #! /usr/bin/end python3
 
-#WEIRD BUG FOUND, HAVE TO WRITE EXIT TWICE AFTER PIPING
+#WEIRD BUG FOUND, SHOWS UP DURING PIPE :(
 
 #copied from MSTeams
 def parse(cmdString):
@@ -18,37 +18,39 @@ def parse(cmdString):
         [outFile, inFile] = outFile.split('<', 1)
         outFile = outFile.strip()
         inFile = inFile.strip()
-    return cmd.split(), outFile, inFile
+    return cmd, outFile, inFile
 
 #pipe, first and second command are extracted first from the string
 def pipe(cmdString):
-    first = cmdString.split('|')[0]
-    second = cmdString.split('|')[1]
+    first = cmdString.split('|')[0]#first pipe command
+    second = cmdString.split('|')[1]#second pipe command
     #next we pipe
     pr,pw = os.pipe()
-    for f in (pr, pw):
-        os.set_inheritable(f, True)
     rc = os.fork()
     if rc < 0:
         os.write(1, "fork failed".encode())
         sys.exit(1)
     elif rc == 0:                   # child (forked ok)
-        stdout = os.dup(1)
-        stdin = os.dup(0)
         os.close(1)#disconnect display (fd1)
-        os.dup2(pw, 1)#pipe input to display (fd1)
+        os.dup(pw)#pipe input to display (fd1)
+        os.set_inheritable(1, True)
         for fd in (pr, pw):
             os.close(fd)#disconnect from pipe
         exe(first)#replace memory
+        os.write(1, ("Could not execute: %s\n"%first).encode())
+        sys.exit(1)
     else:                           # parent (forked ok)
-        stdout = os.dup(1)
-        stdin = os.dup(0)
         os.close(0)#disconnect input
-        os.dup2(pr, 0)#pipe output to input (fd0)
+        os.dup(pr)#pipe output to input (fd0)
+        os.set_inheritable(0, True)
         for fd in (pr, pw):
             os.close(fd)#disconnect from pipe
-        exe(second)
-        os.write(1, "Piped..!".encode())
+        if "|" in second:#if there is more pipes, run again
+            pipe(second)
+        exe(second)#replace memory
+        os.write(1, ("Could not execute: %s\n"%second).encode())
+        sys.exit(1)
+    os.write(1, "Piped..!".encode())
 
 #exe commands, exec demo from lab
 def exe(cmd):
@@ -70,46 +72,35 @@ def exe(cmd):
 
 def exeOut(cmd):
     cmd, outFile, inFile = parse(cmd)
-    os.write(1, (" out: %s" % outFile).encode())
-    os.write(1, (" in: %s \n" % inFile).encode())
+    os.write(1, (" outFile: %s" % outFile).encode())
+    os.write(1, (" inFile: %s \n" % inFile).encode())
     cFork = os.fork()
     if cFork < 0:
         os.write(1, "Fork failed -exe".encode())
         sys.exit(1)
     elif cFork == 0:
-        #cmd = cmd.split()
-        command = "/bin/"+cmd[0]
-        os.close(1) #redirect stdout
-        os.open(inFile, os.O_CREAT | os.O_WRONLY);
-        os.set_inheritable(1, True)
-        try:
-            os.execve(command, cmd, os.environ)
-        except FileNotFoundError:
-            os.write(1, ("%s: command not found\n" % cmd[0]).encode())
-            pass
+        os.close(0) #redirect stdout
+        os.open(inFile, os.O_CREAT | os.O_WRONLY);#open file
+        os.set_inheritable(0, True)#set inheritable
+        exe(cmd)#exe command
+        os.write(1, ("Could not execute: %s\n" % cmd).encode())
     else:
         cFork = os.wait()
 
 def exeIn(cmd):
     cmd, outFile, inFile = parse(cmd)
-    os.write(1, (cmd[0]).encode())
-    os.write(1, (" out: %s" %outFile).encode())
-    os.write(1, (" in: %s \n" % inFile).encode())
+    os.write(1, (" outFile: %s" %outFile).encode())
+    os.write(1, (" inFile: %s \n" % inFile).encode())
     cFork = os.fork()
     if cFork < 0:
         os.write(1, "Fork failed -exe".encode())
         sys.exit(1)
     elif cFork == 0:
-        #cmd = cmd.split()
-        command = "/bin/"+cmd[0]
         os.close(1) #redirect stdin
-        os.open(outFile, os.O_CREAT | os.O_WRONLY);
-        os.set_inheritable(1, True)
-        try:
-            os.execve(command, cmd, os.environ)
-        except FileNotFoundError:
-            os.write(1, ("%s: command not found\n" % cmd[0]).encode())
-            pass
+        os.open(outFile, os.O_CREAT | os.O_WRONLY);#open file
+        os.set_inheritable(1, True)#set inheritable
+        exe(cmd)#exe command
+        os.write(1, ("Could not execute: %s\n" % cmd).encode())
     else:
         cFork = os.wait()
         

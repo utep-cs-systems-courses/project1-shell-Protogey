@@ -1,0 +1,3 @@
+hi test
+Could not execute: echo hi test 
+$ exiting
