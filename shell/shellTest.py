@@ -71,7 +71,11 @@ def exe(cmd):
         rc = os.wait()
 
 def exeOut(cmd):
-    cmd, outFile, inFile = parse(cmd)
+    cmd, outFile, inFile = parse(cmd)#for some reason puts command on infile, and infile at cmd
+    outFile = inFile#temp hold infile
+    inFile = cmd.strip()#update to infile
+    cmd = outFile#update to cmd
+    os.write(1, ("cmd: %s" %cmd).encode())
     os.write(1, (" outFile: %s" % outFile).encode())
     os.write(1, (" inFile: %s \n" % inFile).encode())
     cFork = os.fork()
@@ -80,15 +84,16 @@ def exeOut(cmd):
         sys.exit(1)
     elif cFork == 0:
         os.close(0) #redirect stdout
-        os.open(inFile, os.O_CREAT | os.O_WRONLY);#open file
+        os.open(inFile, os.O_RDONLY);#open file
         os.set_inheritable(0, True)#set inheritable
-        exe(cmd)#exe command
-        os.write(1, ("Could not execute: %s\n" % cmd).encode())
+        exe(cmd)#exe c ommand
+        #os.write(1, ("Could not execute: %s\n" % cmd).encode())
     else:
         cFork = os.wait()
 
 def exeIn(cmd):
     cmd, outFile, inFile = parse(cmd)
+    os.write(1, ("cmd: %s" %cmd).encode())
     os.write(1, (" outFile: %s" %outFile).encode())
     os.write(1, (" inFile: %s \n" % inFile).encode())
     cFork = os.fork()
@@ -100,7 +105,7 @@ def exeIn(cmd):
         os.open(outFile, os.O_CREAT | os.O_WRONLY);#open file
         os.set_inheritable(1, True)#set inheritable
         exe(cmd)#exe command
-        os.write(1, ("Could not execute: %s\n" % cmd).encode())
+        #os.write(1, ("Could not execute: %s\n" % cmd).encode())
     else:
         cFork = os.wait()
         

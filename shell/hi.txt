@@ -1,3 +1,4 @@
-hi test
-Could not execute: echo hi test 
+hi
+$ exiting
+execute: echo hi 
 $ exiting
