@@ -52,20 +52,14 @@ def pipe(cmdString):
 
 #exe commands, exec demo from lab
 def exe(cmd):
-    cFork = os.fork()
-    if cFork < 0:
-        os.write(1, "Fork failed -exe".encode())
-        sys.exit(1)
-    elif cFork == 0:
-        cmd = cmd.split()
-        command = "/bin/"+cmd[0]
+    cmd = cmd.split()
+    for dir in re.split(":", os.environ['PATH']):
+        prog = "%s/%s" % (dir, cmd[0])
         try:
-            os.execve(command, cmd, os.environ)
+            os.execve(prog, cmd, os.environ)
         except FileNotFoundError:
-            os.write(1, ("%s: command not found\n" % cmd[0]).encode())
+            os.write(1, ("%s: command not found: exe method\n" % cmd[0]).encode())
             pass
-    else:
-        cFork = os.wait()
 
 def exeOut(cmd):
     cmd, outFile, inFile = parse(cmd)
@@ -107,7 +101,7 @@ def exeIn(cmd):
         try:
             os.execve(command, cmd, os.environ)
         except FileNotFoundError:
-            os.write(1, ("%s: command no found\n" % cmd[0]).encode())
+            os.write(1, ("%s: command not found\n" % cmd[0]).encode())
             pass
     else:
         cFork = os.wait()
